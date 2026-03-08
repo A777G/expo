@@ -1,32 +1,262 @@
----
-title: Set up your environment
-description: Learn how to set up your development environment to start building with Expo.
-hideTOC: true
-searchRank: 3
----
+import React, { useState, useRef } from 'react';
+import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator } from 'react-native';
+import * as Speech from 'expo-speech';
+import { Audio } from 'expo-av';
+import axios from 'axios';
 
-import { DevelopmentEnvironmentInstructions } from '~/scenes/get-started/set-up-your-environment/DevelopmentEnvironmentInstructions';
-import { DevelopmentModeForm } from '~/scenes/get-started/set-up-your-environment/DevelopmentModeForm';
-import { PlatformAndDeviceForm } from '~/scenes/get-started/set-up-your-environment/PlatformAndDeviceForm';
+// BOGUŚ WSZECHWIEDZĄCY - GŁÓWNY RDZEŃ MOBILNY
+// Architekt: Adamah | AI: Boguś
+// Wierność cytowania: 100% | Spekulacja: 0%
 
-Let's set up a local development environment for running your project on Android and iOS.
+const API = "http://192.168.2.222:8000/api";
 
-## Where would you like to develop?
+export default function App() {
+  const [activeTab, setActiveTab] = useState('CORE');
+  const [msg, setMsg] = useState("");
+  const [chat, setChat] = useState([{ role: 'BOGUŚ', text: 'System operacyjny gotowy. Tryb wierności cytowania aktywny. Podaj komendę, Adamah.' }]);
+  const [recording, setRecording] = useState(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const scrollViewRef = useRef();
 
-We recommend using a real device to develop, since you'll get to see exactly what your users will see.
+  // Ochrona Leksykalna (Weryfikacja lokalna)
+  const forbiddenWords = [
+    "prawdopodobnie", "możliwe", "wydaje się", "zdaje się", "chyba", "raczej", "około",
+    "mniej więcej", "szacunkowo", "w przybliżeniu", "gdzieś", "zazwyczaj", "często",
+    "w większości", "na ogół", "zwykle", "typowo", "mogłoby", "teoretycznie", "potencjalnie",
+    "hipotetycznie", "podobno", "według niektórych", "słyszałem", "to zależy", "trudno powiedzieć",
+    "różnie bywa", "niekoniecznie", "oczywiście", "zdecydowanie"
+  ];
 
-<PlatformAndDeviceForm />
+  const fidelityGuard = (text) => {
+    const lowerText = text.toLowerCase();
+    for (let word of forbiddenWords) {
+      if (lowerText.includes(word)) {
+        return `[BŁĄD SYNTEZY] Wykryto słowo zakazane: "${word}". Odpowiedź zablokowana. Naruszenie reguł Adamaha.`;
+      }
+    }
+    return text;
+  };
 
-## How would you like to develop?
+  const handleSend = async () => {
+    if (!msg.trim()) return;
+    
+    const userMessage = msg;
+    setMsg("");
+    setChat(prev => [...prev, { role: 'ADAMAH', text: userMessage }]);
+    setIsProcessing(true);
 
-Expo Go is a playground for students and learners to try Expo quickly. A development build is a build of your own app that includes Expo's developer tools.
+    try {
+      // Wysłanie danych do głównego serwera Bunkra
+      const res = await axios.post(`${API}/ai/chat`, { message: userMessage, mode: 'EXPERT_STRICT' });
+      
+      // Filtracja wierności
+      let reply = fidelityGuard(res.data.reply || "Otrzymano surowe dane.");
+      
+      setChat(prev => [...prev, { role: 'BOGUŚ', text: reply }]);
+      Speech.speak(reply, { language: 'pl' });
+    } catch (err) {
+      const errorMsg = "Brak połączenia z rdzeniem. Weryfikacja lokalna w toku. " + err.message;
+      setChat(prev => [...prev, { role: 'BOGUŚ', text: errorMsg }]);
+      Speech.speak("Błąd połączenia.", { language: 'pl' });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
-<DevelopmentModeForm />
+  const startRecord = async () => {
+    try {
+      const perm = await Audio.requestPermissionsAsync();
+      if (!perm.granted) {
+        setChat(prev => [...prev, { role: 'BOGUŚ', text: 'Brak dostępu do mikrofonu.' }]);
+        return;
+      }
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+      const rec = new Audio.Recording();
+      await rec.prepareToRecordAsync(Audio.RECORDING_OPTIONS_PRESET_HIGH_QUALITY);
+      await rec.startAsync();
+      setRecording(rec);
+    } catch (err) {
+      setChat(prev => [...prev, { role: 'BOGUŚ', text: 'Błąd nasłuchu: ' + err.message }]);
+    }
+  };
 
----
+  const stopRecord = async () => {
+    if (!recording) return;
+    setIsProcessing(true);
+    try {
+      await recording.stopAndUnloadAsync();
+      const uri = recording.getURI();
+      
+      const formData = new FormData();
+      formData.append('file', { uri, name: 'voice.m4a', type: 'audio/m4a' });
+      
+      const res = await axios.post(`${API}/stt/transcribe`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      
+      setMsg(res.data.text);
+    } catch (err) {
+      setChat(prev => [...prev, { role: 'BOGUŚ', text: 'Błąd transkrypcji STT: ' + err.message }]);
+    } finally {
+      setRecording(null);
+      setIsProcessing(false);
+    }
+  };
 
-<DevelopmentEnvironmentInstructions />
+  // Renderowanie Widoków na podstawie zakładki
+  const renderCore = () => (
+    <View style={styles.tabContent}>
+      <ScrollView 
+        style={styles.chatArea} 
+        ref={scrollViewRef}
+        onContentSizeChange={() => scrollViewRef.current.scrollToEnd({ animated: true })}
+      >
+        {chat.map((c, i) => (
+          <View key={i} style={c.role === 'ADAMAH' ? styles.msgUser : styles.msgAI}>
+            <Text style={styles.roleText}>{c.role}</Text>
+            <Text style={styles.msgText}>{c.text}</Text>
+          </View>
+        ))}
+        {isProcessing && <ActivityIndicator size="small" color="#f59e0b" style={{ margin: 10 }} />}
+      </ScrollView>
 
-## Next step
+      <View style={styles.inputRow}>
+        <TouchableOpacity 
+          style={recording ? styles.micBtnActive : styles.micBtn} 
+          onPress={recording ? stopRecord : startRecord}
+        >
+          <Text style={styles.btnText}>{recording ? '⏹' : '🎤'}</Text>
+        </TouchableOpacity>
+        <TextInput
+          style={styles.input}
+          value={msg}
+          onChangeText={setMsg}
+          placeholder="Komenda..."
+          placeholderTextColor="#64748b"
+        />
+        <TouchableOpacity style={styles.sendBtn} onPress={handleSend}>
+          <Text style={styles.btnText}>▶</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
 
-You have a project and a development environment. Now it's time to start developing.
+  const renderMechanic = () => (
+    <ScrollView style={styles.tabContent}>
+      <Text style={styles.header}>DIAGNOSTYKA OBD-II</Text>
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Status Pojazdu</Text>
+        <Text style={styles.cardData}>Połączenie CAN: CZEKA NA ADAPTER</Text>
+        <Text style={styles.cardData}>Protokół: ELM327</Text>
+        <Text style={styles.cardData}>Odczyt parametrów: ZABLOKOWANY (BRAK SYGNAŁU)</Text>
+      </View>
+      <TouchableOpacity style={styles.actionBtn}>
+        <Text style={styles.actionBtnText}>SKANUJ KODY BŁĘDÓW (DTC)</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.actionBtn}>
+        <Text style={styles.actionBtnText}>PARAMETRY NA ŻYWO (LIVE DATA)</Text>
+      </TouchableOpacity>
+    </ScrollView>
+  );
+
+  const renderBunker = () => (
+    <ScrollView style={styles.tabContent}>
+      <Text style={styles.header}>BUNKIER WOLNOŚCI</Text>
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Zasoby i Suwerenność</Text>
+        <Text style={styles.cardData}>Shadow Collector: AKTYWNY</Text>
+        <Text style={styles.cardData}>Guardian Trinity: NASŁUCH</Text>
+        <Text style={styles.cardData}>Szyfrowanie: AES-256</Text>
+      </View>
+      <TouchableOpacity style={[styles.actionBtn, {backgroundColor: '#ef4444'}]}>
+        <Text style={styles.actionBtnText}>WYGENERUJ RAPORT FINANSOWY</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={[styles.actionBtn, {backgroundColor: '#10b981'}]}>
+        <Text style={styles.actionBtnText}>PROJEKTOWANIE NOWEJ APLIKACJI</Text>
+      </TouchableOpacity>
+    </ScrollView>
+  );
+
+  return (
+    <SafeAreaView style={styles.container}>
+      {/* Pasek nawigacji górnej */}
+      <View style={styles.topNav}>
+        <Text style={styles.appTitle}>BOGUŚ WSZECHWIEDZĄCY</Text>
+        <Text style={styles.appSubtitle}>Koloseum Danych | Wierność Cytowania: 100%</Text>
+      </View>
+
+      {/* Główny obszar */}
+      {activeTab === 'CORE' && renderCore()}
+      {activeTab === 'MECHANIC' && renderMechanic()}
+      {activeTab === 'BUNKER' && renderBunker()}
+
+      {/* Pasek nawigacji dolnej */}
+      <View style={styles.bottomNav}>
+        <TouchableOpacity style={activeTab === 'CORE' ? styles.navBtnActive : styles.navBtn} onPress={() => setActiveTab('CORE')}>
+          <Text style={styles.navText}>MÓZG</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={activeTab === 'MECHANIC' ? styles.navBtnActive : styles.navBtn} onPress={() => setActiveTab('MECHANIC')}>
+          <Text style={styles.navText}>MECHANIK</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={activeTab === 'BUNKER' ? styles.navBtnActive : styles.navBtn} onPress={() => setActiveTab('BUNKER')}>
+          <Text style={styles.navText}>BUNKIER</Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#020617' },
+  topNav: { padding: 15, backgroundColor: '#0f172a', borderBottomWidth: 1, borderColor: '#334155', alignItems: 'center' },
+  appTitle: { color: '#f59e0b', fontSize: 20, fontWeight: '900', letterSpacing: 1 },
+  appSubtitle: { color: '#94a3b8', fontSize: 10, fontWeight: 'bold', marginTop: 2, letterSpacing: 2, textTransform: 'uppercase' },
+  tabContent: { flex: 1, padding: 10 },
+  header: { color: '#f8fafc', fontSize: 18, fontWeight: '900', marginBottom: 15, textAlign: 'center', letterSpacing: 1 },
+  card: { backgroundColor: '#1e293b', padding: 15, borderRadius: 8, borderWidth: 1, borderColor: '#334155', marginBottom: 15 },
+  cardTitle: { color: '#f59e0b', fontSize: 14, fontWeight: '900', marginBottom: 10, textTransform: 'uppercase' },
+  cardData: { color: '#cbd5e1', fontSize: 12, marginBottom: 5, fontFamily: 'monospace' },
+  actionBtn: { backgroundColor: '#3b82f6', padding: 15, borderRadius: 8, alignItems: 'center', marginBottom: 10 },
+  actionBtnText: { color: '#ffffff', fontWeight: '900', fontSize: 12, letterSpacing: 1 },
+  chatArea: { flex: 1, marginBottom: 10 },
+  msgUser: { alignSelf: 'flex-end', backgroundColor: '#3b82f6', padding: 12, borderRadius: 12, borderBottomRightRadius: 2, maxWidth: '80%', marginVertical: 4 },
+  msgAI: { alignSelf: 'flex-start', backgroundColor: '#1e293b', padding: 12, borderRadius: 12, borderBottomLeftRadius: 2, maxWidth: '90%', marginVertical: 4, borderWidth: 1, borderColor: '#334155' },
+  roleText: { color: '#94a3b8', fontSize: 9, fontWeight: '900', marginBottom: 4, letterSpacing: 1 },
+  msgText: { color: '#f8fafc', fontSize: 14, lineHeight: 20 },
+  inputRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 5 },
+  input: { flex: 1, backgroundColor: '#1e293b', color: '#f8fafc', paddingHorizontal: 15, paddingVertical: 12, borderRadius: 8, borderWidth: 1, borderColor: '#334155', marginHorizontal: 8 },
+  micBtn: { backgroundColor: '#10b981', width: 45, height: 45, borderRadius: 25, justifyContent: 'center', alignItems: 'center' },
+  micBtnActive: { backgroundColor: '#ef4444', width: 45, height: 45, borderRadius: 25, justifyContent: 'center', alignItems: 'center' },
+  sendBtn: { backgroundColor: '#f59e0b', width: 45, height: 45, borderRadius: 25, justifyContent: 'center', alignItems: 'center' },
+  btnText: { color: '#fff', fontSize: 18 },
+  bottomNav: { flexDirection: 'row', backgroundColor: '#0f172a', borderTopWidth: 1, borderColor: '#334155', paddingBottom: 20, paddingTop: 10 },
+  navBtn: { flex: 1, alignItems: 'center', paddingVertical: 10 },
+  navBtnActive: { flex: 1, alignItems: 'center', paddingVertical: 10, borderBottomWidth: 3, borderColor: '#f59e0b' },
+  navText: { color: '#94a3b8', fontSize: 10, fontWeight: '900', letterSpacing: 1 }
+});
+
+------------------------------------------------------------------------------
+
+{
+  "name": "bogus-wszechwiedzacy-os",
+  "version": "1.0.0",
+  "description": "Koloseum Danych. Wierność Cytowania.",
+  "main": "node_modules/expo/AppEntry.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios"
+  },
+  "dependencies": {
+    "expo": "~50.0.0",
+    "expo-speech": "~11.7.0",
+    "expo-av": "~13.10.0",
+    "react": "18.2.0",
+    "react-native": "0.73.0",
+    "axios": "^1.6.2"
+  }
+}
+
+
+
+
