@@ -9,22 +9,28 @@ const demoAnswers = [
   'Twoja przewaga: szybkie iteracje, czytelny UX i gotowość do feedbacku użytkowników.',
 ];
 
+const createMessage = (role, text) => ({
+  id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  role,
+  text,
+});
+
 export default function ChatScreen() {
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState([
-    { role: 'ai', text: 'Cześć, jestem AI Boguś. Jak mogę pomóc przed prezentacją?' },
+    createMessage('ai', 'Cześć, jestem AI Boguś. Jak mogę pomóc przed prezentacją?'),
   ]);
 
   const sendMessage = () => {
     const text = input.trim();
     if (!text) return;
 
-    setMessages((prev) => [...prev, { role: 'user', text }]);
+    setMessages((prev) => [...prev, createMessage('user', text)]);
     setInput('');
 
     setTimeout(() => {
       const answer = demoAnswers[Math.floor(Math.random() * demoAnswers.length)];
-      setMessages((prev) => [...prev, { role: 'ai', text: answer }]);
+      setMessages((prev) => [...prev, createMessage('ai', answer)]);
     }, 400);
   };
 
@@ -34,9 +40,9 @@ export default function ChatScreen() {
         <Text style={styles.title}>Czat AI (demo)</Text>
 
         <ScrollView contentContainerStyle={styles.list}>
-          {messages.map((message, index) => (
+          {messages.map((message) => (
             <View
-              key={`${message.role}-${index}`}
+              key={message.id}
               style={[styles.message, message.role === 'user' ? styles.userMessage : styles.aiMessage]}>
               <Text style={styles.messageText}>{message.text}</Text>
             </View>
