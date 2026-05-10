@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "sandbox",
+    "name": "AI Boguś Wszechwiedzący",
     "slug": "sandbox",
     "sdkVersion": "UNVERSIONED",
     "scheme": "sandbox",
@@ -10,7 +10,7 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#2F1B69"
     },
     "updates": {
       "fallbackToCacheTimeout": 0
@@ -34,7 +34,7 @@
           "image": "./assets/splash.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
+          "backgroundColor": "#2F1B69"
         }
       ]
     ],
