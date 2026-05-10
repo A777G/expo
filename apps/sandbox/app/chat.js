@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -9,28 +9,30 @@ const demoAnswers = [
   'Twoja przewaga: szybkie iteracje, czytelny UX i gotowość do feedbacku użytkowników.',
 ];
 
-const createMessage = (role, text) => ({
-  id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+const createMessage = (id, role, text) => ({
+  id: `msg-${id}`,
   role,
   text,
 });
 
 export default function ChatScreen() {
+  const nextIdRef = useRef(1);
+  const nextId = () => nextIdRef.current++;
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState([
-    createMessage('ai', 'Cześć, jestem AI Boguś. Jak mogę pomóc przed prezentacją?'),
+    createMessage(nextId(), 'ai', 'Cześć, jestem AI Boguś. Jak mogę pomóc przed prezentacją?'),
   ]);
 
   const sendMessage = () => {
     const text = input.trim();
     if (!text) return;
 
-    setMessages((prev) => [...prev, createMessage('user', text)]);
+    setMessages((prev) => [...prev, createMessage(nextId(), 'user', text)]);
     setInput('');
 
     setTimeout(() => {
       const answer = demoAnswers[Math.floor(Math.random() * demoAnswers.length)];
-      setMessages((prev) => [...prev, createMessage('ai', answer)]);
+      setMessages((prev) => [...prev, createMessage(nextId(), 'ai', answer)]);
     }, 400);
   };
 
