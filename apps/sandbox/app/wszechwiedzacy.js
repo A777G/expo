@@ -8,7 +8,7 @@ const scenarios = [
   },
   {
     title: '2) Rozwiązanie',
-    text: '„Mamy 3 czytelne ekrany: Start, Czat AI i Tryb Wszechwiedzący z gotowymi case’ami.”',
+    text: '„Mamy 3 czytelne ekrany: Start, Czat AI i Tryb Wszechwiedzący z gotowymi przypadkami.”',
   },
   {
     title: '3) Wartość',
